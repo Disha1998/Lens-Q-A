@@ -67,6 +67,57 @@ function QuestionDetails() {
     })
   }
 
+  const addVotes = async (data) => {
+    const id = window.localStorage.getItem("profileId");
+    const q = query(collection(db, "Votes"), where("publicationId", "==", data));
+    const querySnapshot = await getDocs(q);
+    if (id) {
+      if (querySnapshot.empty === true) {
+        const docRef = await addDoc(collection(db, "Votes"), {
+          vote: 1,
+          voteBy: arrayUnion(id),
+          publicationId: data
+        });
+        setLikeUp(!likeUp);
+      } else {
+        querySnapshot.forEach(async (react) => {
+          const nycRef = doc(db, 'Votes', react.id);
+          react.data().voteBy.map(async (e) => {
+            if (e === id) {
+              await updateDoc(nycRef, {
+                vote: react.data().vote - 1,
+                voteBy: arrayRemove(id),
+              })
+              setLikeUp(!likeUp);
+            } else if (e !== id) {
+              await updateDoc(nycRef, {
+                vote: react.data().vote + 1,
+                voteBy: arrayUnion(id)
+              })
+              setLikeUp(!likeUp);
+            } else {
+              await updateDoc(nycRef, {
+                vote: react.data().vote,
+                voteBy: react.data().voteBy
+              })
+              setLikeUp(!likeUp);
+            }
+          })
+
+          if (react.data().voteBy.length === 0) {
+            await updateDoc(nycRef, {
+              vote: react.data().vote + 1,
+              voteBy: arrayUnion(id)
+            })
+            setLikeUp(!likeUp);
+          }
+        });
+      }
+    } else {
+      toast.error("Please Login first!");
+    }
+  }
+
 
   useEffect(() => {
     get_posts();
@@ -92,11 +143,17 @@ function QuestionDetails() {
               <p >{post?.metadata?.description}</p>
               <div className='d-flex justify-content-start'>
 
-              
+                {
+                  category.map((e) => {
+                    return (
+                      <Button className='m-2 '>{e}</Button>
+                    )
+                  })
+                }
               </div>
               <div className='d-flex justify-content-between'>
                 <div className='d-flex '>
-                 
+                  {/* <p className='m-2' style={{ margin: '0 5px', cursor: 'pointer' }}>{count} Votes</p> */}
                   <p className='m-2'>{post?.stats?.totalAmountOfComments} Answers</p>
                 </div>
                 <div style={{ cursor: 'pointer' }} className="d-flex">
@@ -117,7 +174,13 @@ function QuestionDetails() {
         <div className='col-12 text-left mt-4'>
           <h3>Answers ({post?.stats?.totalAmountOfComments})</h3>
           <Divider component="li" style={{ listStyle: 'none' }} />
-         
+          {
+            displayCmt && displayCmt.map((e) => {
+              return (
+                <Vote data={e} add={addVotes} update={likeUp} />
+              )
+            })
+          }
         </div>
       </div>
     </div>
